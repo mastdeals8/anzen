@@ -29,10 +29,6 @@ interface BankLedgerProps {
 
 export default function BankLedger({ selectedBank: propSelectedBank }: BankLedgerProps) {
   const { dateRange: globalDateRange } = useFinance();
-  const dateRange = {
-    start: globalDateRange.startDate,
-    end: globalDateRange.endDate,
-  };
 
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [selectedBank, setSelectedBank] = useState<string>('');
@@ -63,7 +59,7 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
     if (selectedBank) {
       loadLedgerEntries();
     }
-  }, [selectedBank, dateRange]);
+  }, [selectedBank, globalDateRange.startDate, globalDateRange.endDate]);
 
   useEffect(() => {
     if (showDetailModal && selectedEntry && selectedEntry.type === 'expense') {
@@ -118,20 +114,20 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
 
       console.log('📊 Loading ledger for bank:', selectedBankData?.bank_name, selectedBankData?.account_number, 'ID:', selectedBank);
       console.log('💰 Opening Balance:', storedOpeningBalance, 'as of', openingBalanceDate);
-      console.log('📅 Date Range:', dateRange.start, 'to', dateRange.end);
+      console.log('📅 Date Range:', globalDateRange.startDate, 'to', globalDateRange.endDate);
 
       // Calculate the effective opening balance for the filtered period
       let effectiveOpeningBalance = storedOpeningBalance;
 
       // If filter starts after the opening balance date, calculate balance up to filter start
-      if (dateRange.start > openingBalanceDate) {
-        console.log('🔄 Calculating opening balance from', openingBalanceDate, 'to', dateRange.start);
+      if (globalDateRange.startDate > openingBalanceDate) {
+        console.log('🔄 Calculating opening balance from', openingBalanceDate, 'to', globalDateRange.startDate);
 
         // Get all transactions between opening_balance_date and filter start date (exclusive)
         const { data: priorTransactions } = await supabase.rpc('calculate_balance_between_dates', {
           p_bank_account_id: selectedBank,
           p_start_date: openingBalanceDate,
-          p_end_date: dateRange.start
+          p_end_date: globalDateRange.startDate
         });
 
         if (priorTransactions && priorTransactions.length > 0) {
@@ -146,7 +142,7 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
       const entries: any[] = [];
 
       // Calculate next day for inclusive end date filtering
-      const endDatePlusOne = new Date(dateRange.end);
+      const endDatePlusOne = new Date(globalDateRange.endDate);
       endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
       const endDateStr = endDatePlusOne.toISOString().split('T')[0];
 
@@ -156,7 +152,7 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
         .from('bank_statement_lines')
         .select('id, transaction_date, description, reference, debit_amount, credit_amount, matched_expense_id, matched_receipt_id, matched_entry_id, notes')
         .eq('bank_account_id', selectedBank)
-        .gte('transaction_date', dateRange.start)
+        .gte('transaction_date', globalDateRange.startDate)
         .lt('transaction_date', endDateStr)
         .order('transaction_date');
 
@@ -283,7 +279,7 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
 
     const csv = [
       `Bank Ledger - ${selectedBankData.bank_name} (${selectedBankData.account_number})`,
-      `Period: ${new Date(dateRange.start).toLocaleDateString('id-ID')} to ${new Date(dateRange.end).toLocaleDateString('id-ID')}`,
+      `Period: ${new Date(globalDateRange.startDate).toLocaleDateString('id-ID')} to ${new Date(globalDateRange.endDate).toLocaleDateString('id-ID')}`,
       `Opening Balance: ${formatAmount(openingBalance, selectedBankData.currency)}`,
       '',
       headers.join(','),
@@ -352,11 +348,11 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
           <div className="mb-4 p-3 bg-blue-50 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">Opening Balance (as of {new Date(dateRange.start).toLocaleDateString('id-ID')})</p>
+                <p className="text-sm font-medium text-gray-700">Opening Balance (as of {new Date(globalDateRange.startDate).toLocaleDateString('id-ID')})</p>
                 <p className="text-lg font-bold text-blue-600">
                   {formatAmount(openingBalance, selectedBankData.currency)}
                 </p>
-                {dateRange.start > selectedBankData.opening_balance_date && (
+                {globalDateRange.startDate > selectedBankData.opening_balance_date && (
                   <p className="text-xs text-gray-500 mt-1">
                     Adjusted for filtered date range
                   </p>
@@ -402,11 +398,11 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
               <tbody className="bg-white divide-y divide-gray-200">
                 <tr className="bg-blue-50 font-semibold">
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(dateRange.start).toLocaleDateString('id-ID')}
+                    {new Date(globalDateRange.startDate).toLocaleDateString('id-ID')}
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-900" colSpan={2}>
                     Opening Balance
-                    {dateRange.start > (selectedBankData?.opening_balance_date || '') && (
+                    {globalDateRange.startDate > (selectedBankData?.opening_balance_date || '') && (
                       <span className="ml-2 text-xs font-normal text-gray-600">(adjusted for date filter)</span>
                     )}
                   </td>
