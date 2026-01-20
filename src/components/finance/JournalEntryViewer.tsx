@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, FileText, Filter } from 'lucide-react';
 import { Modal } from '../Modal';
+import { useFinance } from '../../contexts/FinanceContext';
 
 interface JournalEntry {
   id: string;
@@ -45,29 +46,26 @@ const sourceModuleLabels: Record<string, string> = {
 };
 
 export function JournalEntryViewer({ canManage }: JournalEntryViewerProps) {
+  const { dateRange: globalDateRange } = useFinance();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [entryLines, setEntryLines] = useState<JournalEntryLine[]>([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
   const [filterModule, setFilterModule] = useState('all');
 
   useEffect(() => {
     loadEntries();
-  }, [dateRange, filterModule]);
+  }, [globalDateRange.startDate, globalDateRange.endDate, filterModule]);
 
   const loadEntries = async () => {
     try {
       let query = supabase
         .from('journal_entries')
         .select('*')
-        .gte('entry_date', dateRange.start)
-        .lte('entry_date', dateRange.end)
+        .gte('entry_date', globalDateRange.startDate)
+        .lte('entry_date', globalDateRange.endDate)
         .order('entry_date', { ascending: false })
         .order('entry_number', { ascending: false });
 
@@ -135,21 +133,9 @@ export function JournalEntryViewer({ canManage }: JournalEntryViewerProps) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg"
-          />
-          <span className="text-gray-500">to</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg"
-          />
+          <p className="text-xs text-gray-500">Period is controlled by global date range at top</p>
         </div>
 
         <select
