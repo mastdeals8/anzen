@@ -166,10 +166,6 @@ export function JournalEntryViewerEnhanced({ canManage }: JournalEntryViewerEnha
           />
         </div>
 
-        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded border">
-          Period: {new Date(dateRange.startDate).toLocaleDateString('id-ID')} to {new Date(dateRange.endDate).toLocaleDateString('id-ID')}
-        </div>
-
         <select
           value={filterModule}
           onChange={(e) => setFilterModule(e.target.value)}
@@ -187,21 +183,6 @@ export function JournalEntryViewerEnhanced({ canManage }: JournalEntryViewerEnha
         </select>
       </div>
 
-      {/* Totals */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-blue-50 rounded-lg p-4">
-          <p className="text-sm text-blue-600">Total Debit</p>
-          <p className="text-2xl font-bold text-blue-700">
-            Rp {totals.debit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        <div className="bg-green-50 rounded-lg p-4">
-          <p className="text-sm text-green-600">Total Credit</p>
-          <p className="text-2xl font-bold text-green-700">
-            Rp {totals.credit.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-      </div>
 
       {/* Journal Voucher View (Tally Style) - One row per voucher */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
