@@ -8,6 +8,7 @@ import { Calendar, ChevronDown, ChevronRight } from 'lucide-react';
 import { PurchaseInvoiceManager } from '../components/finance/PurchaseInvoiceManager';
 import { ReceiptVoucherManager } from '../components/finance/ReceiptVoucherManager';
 import { PaymentVoucherManager } from '../components/finance/PaymentVoucherManager';
+import { ExpenseManager } from '../components/finance/ExpenseManager';
 import { PettyCashManager } from '../components/finance/PettyCashManager';
 import { FundTransferManager } from '../components/finance/FundTransferManager';
 import { JournalEntryViewerEnhanced as JournalEntryViewer } from '../components/finance/JournalEntryViewerEnhanced';
@@ -26,8 +27,8 @@ import { BankAccountsManager } from '../components/finance/BankAccountsManager';
 import { TaxReports } from '../components/finance/TaxReports';
 
 type FinanceTab =
-  | 'purchase' | 'sales' | 'receipt' | 'payment' | 'journal' | 'contra'
-  | 'ledger' | 'journal_register' | 'bank_ledger' | 'party_ledger'
+  | 'purchase' | 'sales' | 'receipt' | 'payment' | 'journal' | 'contra' | 'expenses' | 'petty_cash'
+  | 'ledger' | 'journal_register' | 'bank_ledger' | 'party_ledger' | 'bank_recon'
   | 'trial_balance' | 'pnl' | 'balance_sheet' | 'receivables' | 'payables' | 'ageing' | 'tax'
   | 'coa' | 'customers' | 'suppliers' | 'products' | 'banks';
 
@@ -53,6 +54,8 @@ const financeMenu: MenuGroup[] = [
       { id: 'payment', label: 'Payment', shortcut: 'F5' },
       { id: 'journal', label: 'Journal', shortcut: 'F7' },
       { id: 'contra', label: 'Contra', shortcut: 'F4' },
+      { id: 'expenses', label: 'Expenses', shortcut: 'F8' },
+      { id: 'petty_cash', label: 'Petty Cash' },
     ]
   },
   {
@@ -62,6 +65,7 @@ const financeMenu: MenuGroup[] = [
       { id: 'journal_register', label: 'Journal Register', shortcut: 'Ctrl+J' },
       { id: 'bank_ledger', label: 'Bank Ledger' },
       { id: 'party_ledger', label: 'Party Ledger' },
+      { id: 'bank_recon', label: 'Bank Reconciliation' },
     ]
   },
   {
@@ -130,6 +134,9 @@ function FinanceContent() {
       } else if (e.key === 'F7') {
         e.preventDefault();
         setActiveTab('journal');
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        setActiveTab('expenses');
       } else if (e.key === 'F9') {
         e.preventDefault();
         setActiveTab('purchase');
@@ -166,6 +173,10 @@ function FinanceContent() {
         return <div className="text-center p-8">Manual Journal Entry form coming soon</div>;
       case 'contra':
         return <FundTransferManager canManage={canManage} />;
+      case 'expenses':
+        return <ExpenseManager canManage={canManage} />;
+      case 'petty_cash':
+        return <PettyCashManager canManage={canManage} onNavigateToFundTransfer={() => setActiveTab('contra')} />;
       case 'ledger':
         return <AccountLedger />;
       case 'journal_register':
@@ -174,6 +185,8 @@ function FinanceContent() {
         return <BankLedger />;
       case 'party_ledger':
         return <PartyLedger />;
+      case 'bank_recon':
+        return <BankReconciliation canManage={canManage} />;
       case 'trial_balance':
         return <FinancialReports initialReport="trial_balance" />;
       case 'pnl':
