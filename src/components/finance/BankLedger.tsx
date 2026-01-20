@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { BookOpen, Download, RefreshCw } from 'lucide-react';
 import { Modal } from '../Modal';
+import { useFinance } from '../../contexts/FinanceContext';
 
 interface BankAccount {
   id: string;
@@ -27,6 +28,12 @@ interface BankLedgerProps {
 }
 
 export default function BankLedger({ selectedBank: propSelectedBank }: BankLedgerProps) {
+  const { dateRange: globalDateRange } = useFinance();
+  const dateRange = {
+    start: globalDateRange.startDate,
+    end: globalDateRange.endDate,
+  };
+
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [ledgerEntries, setLedgerEntries] = useState<any[]>([]);
@@ -35,10 +42,6 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [expenseDocuments, setExpenseDocuments] = useState<string[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
   const [openingBalance, setOpeningBalance] = useState(0);
   const [showOpeningBalanceModal, setShowOpeningBalanceModal] = useState(false);
   const [openingBalanceForm, setOpeningBalanceForm] = useState({
@@ -328,40 +331,21 @@ export default function BankLedger({ selectedBank: propSelectedBank }: BankLedge
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bank Account</label>
-            <select
-              value={selectedBank}
-              onChange={(e) => setSelectedBank(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              <option value="">Select Bank Account</option>
-              {banks.map(bank => (
-                <option key={bank.id} value={bank.id}>
-                  {bank.bank_name} - {bank.account_number}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
-            />
-          </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Bank Account</label>
+          <select
+            value={selectedBank}
+            onChange={(e) => setSelectedBank(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg max-w-md"
+          >
+            <option value="">Select Bank Account</option>
+            {banks.map(bank => (
+              <option key={bank.id} value={bank.id}>
+                {bank.bank_name} - {bank.account_number} ({bank.currency})
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Period is controlled by global date range at top</p>
         </div>
 
         {selectedBankData && (
