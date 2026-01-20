@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import { FinanceProvider, useFinance } from '../contexts/FinanceContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronRight } from 'lucide-react';
 
 // Import all finance components
 import { PurchaseInvoiceManager } from '../components/finance/PurchaseInvoiceManager';
@@ -29,7 +29,7 @@ type FinanceTab =
   | 'purchase' | 'sales' | 'receipt' | 'payment' | 'journal' | 'contra'
   | 'ledger' | 'journal_register' | 'bank_ledger' | 'party_ledger'
   | 'trial_balance' | 'pnl' | 'balance_sheet' | 'receivables' | 'payables' | 'ageing' | 'tax'
-  | 'coa' | 'customers' | 'suppliers' | 'products' | 'banks' | 'directors';
+  | 'coa' | 'customers' | 'suppliers' | 'products' | 'banks';
 
 interface MenuItem {
   id: FinanceTab;
@@ -40,6 +40,7 @@ interface MenuItem {
 interface MenuGroup {
   label: string;
   items: MenuItem[];
+  collapsible?: boolean;
 }
 
 const financeMenu: MenuGroup[] = [
@@ -65,6 +66,7 @@ const financeMenu: MenuGroup[] = [
   },
   {
     label: 'REPORTS',
+    collapsible: true,
     items: [
       { id: 'trial_balance', label: 'Trial Balance' },
       { id: 'pnl', label: 'Profit & Loss' },
@@ -77,11 +79,11 @@ const financeMenu: MenuGroup[] = [
   },
   {
     label: 'MASTERS',
+    collapsible: true,
     items: [
       { id: 'coa', label: 'Chart of Accounts' },
       { id: 'suppliers', label: 'Suppliers' },
       { id: 'banks', label: 'Banks' },
-      { id: 'directors', label: 'Directors' },
     ]
   }
 ];
@@ -90,7 +92,20 @@ function FinanceContent() {
   const { profile } = useAuth();
   const { dateRange, setDateRange } = useFinance();
   const [activeTab, setActiveTab] = useState<FinanceTab>('purchase');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const canManage = profile?.role === 'admin' || profile?.role === 'accounts';
+
+  const toggleGroup = (groupLabel: string) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupLabel)) {
+        newSet.delete(groupLabel);
+      } else {
+        newSet.add(groupLabel);
+      }
+      return newSet;
+    });
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -179,8 +194,6 @@ function FinanceContent() {
         return <SuppliersManager canManage={canManage} />;
       case 'banks':
         return <BankAccountsManager canManage={canManage} />;
-      case 'directors':
-        return <div className="text-center p-8">Directors master coming soon</div>;
       default:
         return <div className="text-center p-8 text-gray-500">Select a module from the menu</div>;
     }
@@ -189,37 +202,59 @@ function FinanceContent() {
   return (
     <Layout>
       <div className="flex h-screen bg-gray-50">
-        {/* Left Sidebar - Clean Menu */}
+        {/* Left Sidebar - Narrow Professional Menu */}
         <div className="w-56 bg-white border-r border-gray-200 flex flex-col">
           {/* Menu Groups */}
           <div className="flex-1 overflow-y-auto">
-            {financeMenu.map((group, groupIdx) => (
-              <div key={group.label} className={groupIdx > 0 ? 'border-t border-gray-200' : ''}>
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  {group.label}
-                </div>
-                <div>
-                  {group.items.map((item) => (
+            {financeMenu.map((group, groupIdx) => {
+              const isCollapsed = collapsedGroups.has(group.label);
+              const isCollapsible = group.collapsible;
+
+              return (
+                <div key={group.label} className={groupIdx > 0 ? 'border-t border-gray-200' : ''}>
+                  {isCollapsible ? (
                     <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        activeTab === item.id
-                          ? 'bg-blue-50 text-blue-700 font-medium border-l-2 border-blue-600'
-                          : 'text-gray-700 hover:bg-gray-50 border-l-2 border-transparent'
-                      }`}
+                      onClick={() => toggleGroup(group.label)}
+                      className="w-full px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between hover:bg-gray-50"
                     >
-                      <div className="flex items-center justify-between">
-                        <span>{item.label}</span>
-                        {item.shortcut && (
-                          <span className="text-xs text-gray-400">{item.shortcut}</span>
-                        )}
-                      </div>
+                      <span>{group.label}</span>
+                      {isCollapsed ? (
+                        <ChevronRight className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
                     </button>
-                  ))}
+                  ) : (
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {group.label}
+                    </div>
+                  )}
+
+                  {!isCollapsed && (
+                    <div>
+                      {group.items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveTab(item.id)}
+                          className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                            activeTab === item.id
+                              ? 'bg-blue-50 text-blue-700 font-medium border-l-2 border-blue-600'
+                              : 'text-gray-700 hover:bg-gray-50 border-l-2 border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{item.label}</span>
+                            {item.shortcut && (
+                              <span className="text-xs text-gray-400">{item.shortcut}</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

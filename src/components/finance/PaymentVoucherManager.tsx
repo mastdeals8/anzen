@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Search, ArrowUpCircle } from 'lucide-react';
+import { Plus, Search, ArrowUpCircle, Printer } from 'lucide-react';
 import { Modal } from '../Modal';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Supplier {
   id: string;
@@ -51,6 +53,7 @@ interface PaymentVoucherManagerProps {
 }
 
 export function PaymentVoucherManager({ canManage }: PaymentVoucherManagerProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   const [vouchers, setVouchers] = useState<PaymentVoucher[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -58,8 +61,13 @@ export function PaymentVoucherManager({ canManage }: PaymentVoucherManagerProps)
   const [taxCodes, setTaxCodes] = useState<TaxCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedVoucher, setSelectedVoucher] = useState<PaymentVoucher | null>(null);
+  const [voucherAllocations, setVoucherAllocations] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [allocations, setAllocations] = useState<{ invoiceId: string; amount: number }[]>([]);
+  const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
 
   const [formData, setFormData] = useState({
     voucher_date: new Date().toISOString().split('T')[0],

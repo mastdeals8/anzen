@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Eye, Search, ArrowDownCircle, Check, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Eye, Search, ArrowDownCircle, Check, Edit2, Trash2, X, Printer } from 'lucide-react';
 import { Modal } from '../Modal';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Customer {
   id: string;
@@ -59,6 +61,7 @@ interface ReceiptVoucherManagerProps {
 }
 
 export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   const [vouchers, setVouchers] = useState<ReceiptVoucher[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
@@ -71,6 +74,8 @@ export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps)
   const [voucherAllocations, setVoucherAllocations] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [allocations, setAllocations] = useState<{ targetId: string; targetType: 'invoice' | 'salesorder'; amount: number }[]>([]);
+  const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
 
   const [formData, setFormData] = useState({
     voucher_date: new Date().toISOString().split('T')[0],
@@ -86,7 +91,20 @@ export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps)
     loadVouchers();
     loadCustomers();
     loadBankAccounts();
+    loadCompanySettings();
   }, []);
+
+  const loadCompanySettings = async () => {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('company_name, company_address')
+      .single();
+
+    if (data) {
+      setCompanyName(data.company_name || '');
+      setCompanyAddress(data.company_address || '');
+    }
+  };
 
   useEffect(() => {
     if (formData.customer_id) {
@@ -266,6 +284,29 @@ export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps)
   };
 
   const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
+
+  const handlePrint = async () => {
+    if (!printRef.current || !selectedVoucher) return;
+
+    try {
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Receipt-${selectedVoucher.voucher_number}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -868,7 +909,14 @@ export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps)
               )}
             </div>
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-between pt-4">
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                Print PDF
+              </button>
               <button
                 onClick={() => { setViewModalOpen(false); setSelectedVoucher(null); setVoucherAllocations([]); }}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
@@ -879,6 +927,153 @@ export function ReceiptVoucherManager({ canManage }: ReceiptVoucherManagerProps)
           </div>
         )}
       </Modal>
+
+      {/* Hidden Print Format */}
+      {selectedVoucher && (
+        <div ref={printRef} style={{ position: 'absolute', left: '-9999px', width: '210mm', padding: '15mm', backgroundColor: '#fff' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #333', paddingBottom: '15px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 5px 0', color: '#1a1a1a' }}>
+              {companyName || 'Company Name'}
+            </h1>
+            {companyAddress && (
+              <p style={{ fontSize: '11px', margin: '0', color: '#666' }}>{companyAddress}</p>
+            )}
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: '15px 0 0 0', color: '#2563eb' }}>
+              RECEIPT VOUCHER
+            </h2>
+          </div>
+
+          {/* Voucher Details */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#666', margin: '0 0 3px 0' }}>Voucher No:</p>
+              <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0', fontFamily: 'monospace' }}>
+                {selectedVoucher.voucher_number}
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#666', margin: '0 0 3px 0' }}>Date:</p>
+              <p style={{ fontSize: '14px', fontWeight: 'bold', margin: '0' }}>
+                {new Date(selectedVoucher.voucher_date).toLocaleDateString('id-ID', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </p>
+            </div>
+          </div>
+
+          {/* Received From */}
+          <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#f3f4f6', borderRadius: '6px' }}>
+            <p style={{ fontSize: '11px', fontWeight: '600', color: '#666', margin: '0 0 5px 0' }}>Received From:</p>
+            <p style={{ fontSize: '15px', fontWeight: 'bold', margin: '0', color: '#1a1a1a' }}>
+              {selectedVoucher.customers?.company_name}
+            </p>
+          </div>
+
+          {/* Amount */}
+          <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#dbeafe', borderRadius: '8px', border: '2px solid #2563eb' }}>
+            <p style={{ fontSize: '11px', fontWeight: '600', color: '#1e40af', margin: '0 0 5px 0' }}>Amount Received:</p>
+            <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#1e40af' }}>
+              Rp {selectedVoucher.amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+
+          {/* Payment Details */}
+          <div style={{ marginBottom: '20px' }}>
+            <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '8px 0', fontWeight: '600', color: '#666', width: '35%' }}>Payment Method:</td>
+                  <td style={{ padding: '8px 0', textTransform: 'capitalize' }}>
+                    {selectedVoucher.payment_method.replace('_', ' ')}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px 0', fontWeight: '600', color: '#666' }}>Bank Account:</td>
+                  <td style={{ padding: '8px 0' }}>
+                    {selectedVoucher.bank_accounts?.alias ||
+                     (selectedVoucher.bank_accounts ?
+                      `${selectedVoucher.bank_accounts.bank_name} - ${selectedVoucher.bank_accounts.account_name}` :
+                      '-')}
+                  </td>
+                </tr>
+                {selectedVoucher.reference_number && (
+                  <tr>
+                    <td style={{ padding: '8px 0', fontWeight: '600', color: '#666' }}>Reference:</td>
+                    <td style={{ padding: '8px 0', fontFamily: 'monospace' }}>{selectedVoucher.reference_number}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Allocations */}
+          {voucherAllocations.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontSize: '13px', fontWeight: 'bold', margin: '0 0 10px 0', color: '#1a1a1a' }}>
+                Allocation Details:
+              </p>
+              <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse', border: '1px solid #d1d5db' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f3f4f6' }}>
+                    <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #d1d5db' }}>Document</th>
+                    <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #d1d5db' }}>Type</th>
+                    <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #d1d5db' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {voucherAllocations.map((alloc, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '8px', borderBottom: idx < voucherAllocations.length - 1 ? '1px solid #e5e7eb' : 'none', fontFamily: 'monospace' }}>
+                        {alloc.sales_invoices ? alloc.sales_invoices.invoice_number : alloc.sales_orders?.so_number}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center', borderBottom: idx < voucherAllocations.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                        {alloc.sales_order_id ? 'SO (Advance)' : 'Invoice'}
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'right', borderBottom: idx < voucherAllocations.length - 1 ? '1px solid #e5e7eb' : 'none', fontWeight: '600' }}>
+                        Rp {alloc.allocated_amount.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Description */}
+          {selectedVoucher.description && (
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#666', margin: '0 0 5px 0' }}>Description:</p>
+              <p style={{ fontSize: '12px', margin: '0', color: '#1a1a1a' }}>{selectedVoucher.description}</p>
+            </div>
+          )}
+
+          {/* Signature Section */}
+          <div style={{ marginTop: '40px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ height: '60px' }}></div>
+              <div style={{ borderTop: '1px solid #333', paddingTop: '5px' }}>
+                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0' }}>Received By</p>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ height: '60px' }}></div>
+              <div style={{ borderTop: '1px solid #333', paddingTop: '5px' }}>
+                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0' }}>Approved By</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: '30px', textAlign: 'center', paddingTop: '15px', borderTop: '1px solid #e5e7eb' }}>
+            <p style={{ fontSize: '10px', color: '#999', margin: '0' }}>
+              This is a computer-generated document. No signature required.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
