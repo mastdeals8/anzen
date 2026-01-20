@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Layout } from '../components/Layout';
 import { Modal } from '../components/Modal';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { FinanceProvider, useFinance } from '../contexts/FinanceContext';
 import { supabase } from '../lib/supabase';
 import {
   Plus, DollarSign, TrendingUp, TrendingDown,
   CreditCard, Receipt, BookOpen, Building2,
   ArrowDownCircle, ArrowUpCircle, Wallet, FileText, BarChart3,
-  ChevronRight, Landmark, Users, AlertCircle, ArrowRightLeft
+  ChevronRight, Landmark, Users, AlertCircle, ArrowRightLeft, Calendar
 } from 'lucide-react';
 import { BankAccountsManager } from '../components/finance/BankAccountsManager';
 import { ReceivablesManager } from '../components/finance/ReceivablesManager';
@@ -30,6 +31,7 @@ import BankLedger from '../components/finance/BankLedger';
 import PartyLedger from '../components/finance/PartyLedger';
 import OutstandingSummary from '../components/finance/OutstandingSummary';
 import { FundTransferManager } from '../components/finance/FundTransferManager';
+import { AccountLedger } from '../components/finance/AccountLedger';
 
 interface FinanceExpense {
   id: string;
@@ -51,7 +53,7 @@ interface Batch {
 type FinanceSection = 'record' | 'track' | 'reports' | 'masters';
 type FinanceTab =
   | 'purchase_invoices' | 'receipts' | 'payments' | 'expenses' | 'petty_cash' | 'fund_transfers' | 'journal'
-  | 'party_ledger' | 'outstanding' | 'receivables' | 'payables' | 'bank_ledger' | 'reconciliation' | 'ageing'
+  | 'account_ledger' | 'party_ledger' | 'outstanding' | 'receivables' | 'payables' | 'bank_ledger' | 'reconciliation' | 'ageing'
   | 'trial_balance' | 'pnl' | 'balance_sheet' | 'tax_reports'
   | 'coa' | 'suppliers' | 'banks' | 'tax_codes';
 
@@ -77,11 +79,12 @@ const sectionConfig = {
     color: 'green',
     description: 'Monitor balances & status',
     tabs: [
+      { id: 'account_ledger', label: 'Account Ledger', icon: BookOpen, desc: 'Ledger with running balance (Tally-style)' },
       { id: 'party_ledger', label: 'Party Ledger', icon: Users, desc: 'Customer/Supplier account book' },
       { id: 'outstanding', label: 'Outstanding Summary', icon: AlertCircle, desc: 'Aging & follow-up report' },
       { id: 'receivables', label: 'Receivables', icon: TrendingUp, desc: 'Customer outstanding' },
       { id: 'payables', label: 'Payables', icon: TrendingDown, desc: 'Supplier outstanding' },
-      { id: 'bank_ledger', label: 'Bank Ledger', icon: BookOpen, desc: 'Bank book / passbook view' },
+      { id: 'bank_ledger', label: 'Bank Ledger', icon: Landmark, desc: 'Bank book / passbook view' },
       { id: 'reconciliation', label: 'Bank Reconciliation', icon: Landmark, desc: 'Match bank statements' },
       { id: 'ageing', label: 'Ageing Report', icon: BarChart3, desc: 'Overdue analysis' },
     ]
@@ -111,9 +114,10 @@ const sectionConfig = {
   }
 };
 
-export function Finance() {
+function FinanceContent() {
   const { t } = useLanguage();
   const { profile } = useAuth();
+  const { dateRange, setDateRange, triggerRefresh } = useFinance();
 
   // Parse URL hash to get section and tab
   const getFromHash = () => {
@@ -149,6 +153,68 @@ export function Finance() {
   });
 
   const canManage = profile?.role === 'admin' || profile?.role === 'accounts';
+
+  // Keyboard shortcuts (Tally-style)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in input/textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      // F2: Change Date
+      if (e.key === 'F2') {
+        e.preventDefault();
+        const input = document.querySelector('input[type="date"]') as HTMLInputElement;
+        if (input) input.focus();
+      }
+      // F4: Contra (Fund Transfer)
+      else if (e.key === 'F4') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('fund_transfers');
+      }
+      // F5: Payment
+      else if (e.key === 'F5') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('payments');
+      }
+      // F6: Receipt
+      else if (e.key === 'F6') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('receipts');
+      }
+      // F7: Journal
+      else if (e.key === 'F7') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('journal');
+      }
+      // F9: Purchase
+      else if (e.key === 'F9') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('purchase_invoices');
+      }
+      // Ctrl+L: Ledger
+      else if (e.ctrlKey && e.key === 'l') {
+        e.preventDefault();
+        setActiveSection('track');
+        setActiveTab('party_ledger');
+      }
+      // Ctrl+J: Journal
+      else if (e.ctrlKey && e.key === 'j') {
+        e.preventDefault();
+        setActiveSection('record');
+        setActiveTab('journal');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Update hash when tab changes
   useEffect(() => {
@@ -308,6 +374,8 @@ export function Finance() {
         return <FundTransferManager canManage={canManage} />;
       case 'journal':
         return <JournalEntryViewer canManage={canManage} />;
+      case 'account_ledger':
+        return <AccountLedger />;
       case 'party_ledger':
         return <PartyLedger />;
       case 'outstanding':
@@ -342,11 +410,48 @@ export function Finance() {
   return (
     <Layout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* Global Header with Date Range */}
+        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border p-4">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <DollarSign className="w-6 h-6" />
             Finance & Accounting
           </h1>
+
+          {/* Global Date Range Selector */}
+          <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-lg border">
+            <Calendar className="w-5 h-5 text-gray-500" />
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">From:</label>
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <span className="text-gray-500">to</span>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">To:</label>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Keyboard Shortcuts Help */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-700">
+          <span className="font-medium">Quick Keys:</span>
+          <span className="ml-2">F2: Date</span>
+          <span className="ml-3">F5: Payment</span>
+          <span className="ml-3">F6: Receipt</span>
+          <span className="ml-3">F7: Journal</span>
+          <span className="ml-3">F9: Purchase</span>
+          <span className="ml-3">Ctrl+L: Ledger</span>
+          <span className="ml-3">Ctrl+J: Journal</span>
         </div>
 
         <div className="grid grid-cols-4 gap-3">
@@ -495,5 +600,13 @@ export function Finance() {
         </form>
       </Modal>
     </Layout>
+  );
+}
+
+export function Finance() {
+  return (
+    <FinanceProvider>
+      <FinanceContent />
+    </FinanceProvider>
   );
 }

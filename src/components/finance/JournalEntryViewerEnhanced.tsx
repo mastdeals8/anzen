@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useFinance } from '../../contexts/FinanceContext';
 import { Search, FileText, LayoutList, Table2 } from 'lucide-react';
 import { Modal } from '../Modal';
 
@@ -62,16 +63,13 @@ const sourceModuleLabels: Record<string, string> = {
 };
 
 export function JournalEntryViewerEnhanced({ canManage }: JournalEntryViewerEnhancedProps) {
+  const { dateRange } = useFinance();
   const [voucherEntries, setVoucherEntries] = useState<VoucherJournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [entryLines, setEntryLines] = useState<JournalEntryLine[]>([]);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
-  });
   const [filterModule, setFilterModule] = useState('all');
 
   useEffect(() => {
@@ -84,8 +82,8 @@ export function JournalEntryViewerEnhanced({ canManage }: JournalEntryViewerEnha
       let query = supabase
         .from('journal_voucher_view')
         .select('*')
-        .gte('date', dateRange.start)
-        .lte('date', dateRange.end);
+        .gte('date', dateRange.startDate)
+        .lte('date', dateRange.endDate);
 
       if (filterModule !== 'all') {
         query = query.eq('source_module', filterModule);
@@ -168,20 +166,8 @@ export function JournalEntryViewerEnhanced({ canManage }: JournalEntryViewerEnha
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg"
-          />
-          <span className="text-gray-500">to</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-            className="px-3 py-2 border border-gray-300 rounded-lg"
-          />
+        <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded border">
+          Period: {new Date(dateRange.startDate).toLocaleDateString('id-ID')} to {new Date(dateRange.endDate).toLocaleDateString('id-ID')}
         </div>
 
         <select
