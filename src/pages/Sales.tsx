@@ -929,41 +929,41 @@ export function Sales() {
 
         if (invoiceError) throw invoiceError;
         invoice = newInvoice;
-      }
 
-      // Filter and map only valid items (with product_id)
-      const invoiceItemsData = items
-        .filter(item => item.product_id && item.product_id.trim() !== '')
-        .map(item => ({
-          invoice_id: invoice.id,
-          product_id: item.product_id,
-          batch_id: item.batch_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          tax_rate: item.tax_rate,
-          delivery_challan_item_id: item.delivery_challan_item_id || null,
-        }));
+        // Filter and map only valid items (with product_id)
+        const invoiceItemsData = items
+          .filter(item => item.product_id && item.product_id.trim() !== '')
+          .map(item => ({
+            invoice_id: invoice.id,
+            product_id: item.product_id,
+            batch_id: item.batch_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate,
+            delivery_challan_item_id: item.delivery_challan_item_id || null,
+          }));
 
-      const { error: itemsError } = await supabase
-        .from('sales_invoice_items')
-        .insert(invoiceItemsData);
+        const { error: itemsError } = await supabase
+          .from('sales_invoice_items')
+          .insert(invoiceItemsData);
 
-      if (itemsError) {
-        console.error('Error inserting invoice items:', itemsError);
-        console.error('Invoice items data:', invoiceItemsData);
-        throw new Error(`Failed to save invoice items: ${itemsError.message}`);
-      }
+        if (itemsError) {
+          console.error('Error inserting invoice items:', itemsError);
+          console.error('Invoice items data:', invoiceItemsData);
+          throw new Error(`Failed to save invoice items: ${itemsError.message}`);
+        }
 
-      // Verify items were actually inserted
-      const { data: insertedItems, error: verifyError } = await supabase
-        .from('sales_invoice_items')
-        .select('id')
-        .eq('invoice_id', invoice.id);
+        // Verify items were actually inserted
+        const { data: insertedItems, error: verifyError } = await supabase
+          .from('sales_invoice_items')
+          .select('id')
+          .eq('invoice_id', invoice.id);
 
-      if (verifyError) {
-        console.error('Error verifying items:', verifyError);
-      } else if (!insertedItems || insertedItems.length === 0) {
-        throw new Error('Invoice items were not saved. Please try again.');
+        if (verifyError) {
+          console.error('Error verifying items:', verifyError);
+        } else if (!insertedItems || insertedItems.length === 0) {
+          throw new Error('Invoice items were not saved. Please try again.');
+        }
       }
 
       // Stock deduction and inventory transactions are handled automatically by database trigger
